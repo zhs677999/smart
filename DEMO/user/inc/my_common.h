@@ -78,7 +78,7 @@
 // 速度分段控制
 #define STRAIGHT_DEAD_ZONE_DEG      (3.0f)   // 直道死区，舵机偏差小于该角度时视为直道
 #define STRAIGHT_SPEED_DUTY         (35)     // 直道目标 duty
-#define CURVE_SPEED_DUTY            (26)     // 弯道目标 duty
+#define CURVE_SPEED_DUTY            (24)     // 弯道目标 duty，降低过弯速度防止打滑
 #define ROUNDABOUT_SPEED_DUTY       (22)     // 环岛、终点等复杂场景的限速
 #define DUTY_MAX_LIMIT              (50)
 #define DUTY_MIN_LIMIT              (10)
@@ -92,7 +92,7 @@
 
 // 速度闭环期望计数（根据编码器分辨率可调）
 #define TARGET_COUNT_STRAIGHT       (180.0f)
-#define TARGET_COUNT_CURVE          (120.0f)
+#define TARGET_COUNT_CURVE          (105.0f)
 #define TARGET_COUNT_ROUNDABOUT     (90.0f)
 
 // 对外暴露的检测状态

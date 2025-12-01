@@ -117,19 +117,23 @@ static void update_roundabout_alert(void)
     }
 }
 
-// 环岛检测：两侧传感器高亮并维持一定时间，带冷却
+// 环岛检测：使用中间两路的强弱组合防止一般急弯误判
 static void roundabout_detect(void)
 {
-    float left_norm = normalized_adc[0];
-    float right_norm = normalized_adc[3];
-    float threshold_norm = (float)ROUNDABOUT_THRESHOLD / ADC_FULL_SCALE;
+    float mid_norm_left  = normalized_adc[1];
+    float mid_norm_right = normalized_adc[2];
+    // 映射原始阈值（3500 高，1000 低）到归一化范围
+    float high_gate = 3500.0f / ADC_FULL_SCALE;
+    float low_gate  = 1000.0f / ADC_FULL_SCALE;
 
     if(roundabout_cooldown > 0)
     {
         roundabout_cooldown--;
     }
 
-    if((left_norm > threshold_norm) && (right_norm > threshold_norm))
+    // 仅在一高一低的强弱组合出现时累计计数
+    if(((mid_norm_left  > high_gate) && (mid_norm_right < low_gate)) ||
+       ((mid_norm_right > high_gate) && (mid_norm_left  < low_gate)))
     {
         if(roundabout_counter < 0xFFFF)
         {
