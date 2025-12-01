@@ -55,11 +55,11 @@ void Init_All(void)
     pwm_init(SERVO_MOTOR2_PWM, SERVO_MOTOR_FREQ, 0);
     pwm_init(SERVO_MOTOR3_PWM, SERVO_MOTOR_FREQ, 0);
 
-    // 指示灯与蜂鸣器
+    // 指示灯与蜂鸣器（蜂鸣器暂不使用，仅保留初始化示例）
     gpio_init(LED1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
-    gpio_init(BEEP, GPO, GPIO_LOW, GPO_PUSH_PULL);
+    // gpio_init(BEEP, GPO, GPIO_LOW, GPO_PUSH_PULL);
     gpio_set_level(LED1, GPIO_LOW);
-    gpio_set_level(BEEP, GPIO_HIGH);
+    // gpio_set_level(BEEP, GPIO_HIGH);
 }
 
 extern void get_data();
