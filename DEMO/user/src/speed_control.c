@@ -13,6 +13,7 @@ static uint8_t pid_initialized = 0;
 
 extern float servo_motor_angle;
 extern uint8_t finish_detected;
+extern uint8_t off_track_detected;
 extern uint8_t roundabout_detected;
 extern int16 encoder_data_1;
 extern int16 encoder_data_2;
@@ -29,7 +30,7 @@ void set_speed_pwm()
     float angle_delta = fabsf(servo_motor_angle - SERVO_MOTOR_M);
     int8 target_duty = duty;
 
-    if(finish_detected)
+    if(finish_detected || off_track_detected)
     {
         target_duty = 0; // 终点停下
     }

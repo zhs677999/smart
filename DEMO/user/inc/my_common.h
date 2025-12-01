@@ -64,8 +64,16 @@
 // 环岛检测
 #define ROUNDABOUT_THRESHOLD        (800)
 #define ROUNDABOUT_DEBOUNCE         (25)
-#define ROUNDABOUT_HOLD_TIME        (150)
+#define ROUNDABOUT_HOLD_TIME        (200)
 #define ROUNDABOUT_COOLDOWN         (300)
+// 环岛判定：结合原始值特征，避免与急弯/十字路混淆
+#define ROUNDABOUT_RAW_GAP_STRONG   (180)   // 中右传感器极低，进环岛标志
+#define ROUNDABOUT_RAW_GAP_SOFT     (500)   // 中右明显变暗
+#define ROUNDABOUT_OUTER_L_HIGH     (2100)  // 外侧左需高亮
+#define ROUNDABOUT_OUTER_R_HIGH     (1800)  // 外侧右需高亮（排除急弯时右侧变暗）
+#define ROUNDABOUT_MID_HIGH         (1200)  // 中左保持亮度，表示尚未偏出赛道
+#define ROUNDABOUT_LEFT_SPIKE       (3200)  // 到切点时左侧会冲高
+#define ROUNDABOUT_RIGHT_SUPPORT    (2400)  // 切点时右外侧仍保持高亮
 
 // 终点检测
 #define FINISH_THRESHOLD            (0.85f)  // 归一化后的阈值
@@ -75,12 +83,16 @@
 #define ADC_FULL_SCALE              (4095.0f)
 #define FILTER_ALPHA                (0.35f)  // 一阶低通滤波系数
 
+// 失线检测（原始值全低则停车）
+#define OFF_TRACK_THRESHOLD_RAW      (100)
+#define OFF_TRACK_DEBOUNCE           (5)
+
 // 速度分段控制
 #define STRAIGHT_DEAD_ZONE_DEG      (3.0f)   // 直道死区，舵机偏差小于该角度时视为直道
 #define STRAIGHT_SPEED_DUTY         (35)     // 直道目标 duty
 #define CURVE_SPEED_DUTY            (24)     // 弯道目标 duty，降低过弯速度防止打滑
-#define ROUNDABOUT_SPEED_DUTY       (22)     // 环岛、终点等复杂场景的限速
-#define DUTY_MAX_LIMIT              (50)
+#define ROUNDABOUT_SPEED_DUTY       (15)     // 环岛、终点等复杂场景的限速
+#define DUTY_MAX_LIMIT              (40)
 #define DUTY_MIN_LIMIT              (10)
 
 // 电机 PID 参数（用于速度环）
@@ -99,7 +111,9 @@
 extern float filtered_adc[ADC_CHANNEL_NUMBER];
 extern float normalized_adc[ADC_CHANNEL_NUMBER];
 extern float normalized_error;
+extern uint16_t raw_adc[ADC_CHANNEL_NUMBER];
 extern uint8_t finish_detected;
+extern uint8_t off_track_detected;
 extern uint8_t roundabout_detected;
 extern uint16_t roundabout_timer;
 extern uint16_t roundabout_cooldown;

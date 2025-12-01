@@ -9,47 +9,52 @@ float servo_motor_angle = SERVO_MOTOR_M;
 // PD 调节参数
 // -----------------------------------------------------------
 // 基于归一化误差重新整定，整体增大舵机响应速度
-float kp = 16.0f;
-float kd = 6.5f;
+float kp = 110.0f;
+float kd = 70.5f;
 // 锐角弯动态增益
-static const float sharp_turn_error = 0.32f;
+static const float sharp_turn_error = 0.42f;
 static const float sharp_turn_gain  = 1.8f;
-static const float quick_turn_feedforward = 20.0f;
+static const float quick_turn_feedforward = 40.0f;
 // 连续反向急弯的额外前馈，帮助舵机快速“打回来”
 static const float sign_flip_threshold = 0.18f;
-static const float sign_flip_boost     = 12.0f;
+static const float sign_flip_boost     = 6.0f;
 // 环岛进入时的舵机直行保持比例（靠计时器逐渐退出）
-static const float roundabout_straight_ratio_high = 0.85f;
-static const float roundabout_straight_ratio_low  = 0.35f;
+static const float roundabout_straight_ratio_high = 0.35f;
+static const float roundabout_straight_ratio_low  = 0.15f;
 // 环岛阶段允许的最大偏转角，先小后大，避免提前偏航
-static const float roundabout_entry_offset_min = 10.0f;
-static const float roundabout_entry_offset_max = 28.0f;
+static const float roundabout_entry_offset_min = 20.0f;
+static const float roundabout_entry_offset_max = 38.0f;
 // -----------------------------------------------------------
 
 extern float normalized_error;      // 归一化后的左右差值
+extern float normalized_adc[ADC_CHANNEL_NUMBER];
 float last_adc_error = 0;           // 上一次误差（用于 D 项与换向检测）
 extern uint8_t roundabout_detected;
 extern uint16_t roundabout_timer;
 
 void set_servo_pwm()
 {
-/*动态pid
-	if (fabsf(normalized_error) > 0.3f) {
-    kp = 18.0f;  // 大误差时更激进
-    kd = 0.0f;   //
-}  */
-	
-	
-	
+    // 动态 PID：误差较大时提高响应
+    if (fabsf(normalized_error) > 0.3f) {
+        kp = 110.0f;  // 大误差时更激进
+        kd = 70.0f;
+    }
+
+    // 基于整体左右强度差的急弯特征，先行放大误差
+    float left_sum  = normalized_adc[0] + normalized_adc[1];
+    float right_sum = normalized_adc[2] + normalized_adc[3];
+    float lateral_balance = left_sum - right_sum;
+    float strong_turn_weight = fminf(fabsf(lateral_balance) / 0.55f, 1.5f); // 2000/1930 vs 539/1141 对应约 0.55 差值
+
     // 非线性误差放大，对小误差敏感，对大误差饱和
-    float error_gain = 1.0f;
+    float error_gain = 2.0f + 0.4f * strong_turn_weight;
     if (fabsf(normalized_error) > 0.2f) {
-        error_gain = 1.5f;  // 大误差时增益更大
+        error_gain = 1.5f + 0.3f * strong_turn_weight;  // 大误差时增益更大
     }
 
     // 锐角弯时进一步提升比例系数
     float adaptive_kp = kp;
-    if (fabsf(normalized_error) > sharp_turn_error) {
+    if ((fabsf(normalized_error) > sharp_turn_error) || (fabsf(lateral_balance) > 0.35f)) {
         adaptive_kp *= sharp_turn_gain;
     }
 
@@ -61,8 +66,9 @@ void set_servo_pwm()
 
     // 快速转向前馈：误差大的时候直接给舵机额外角度，减少响应延迟
     float quick_out = 0.0f;
-    if (fabsf(normalized_error) > sharp_turn_error) {
-        quick_out = quick_turn_feedforward * normalized_error;
+    if ((fabsf(normalized_error) > sharp_turn_error) || (fabsf(lateral_balance) > 0.35f)) {
+        float lateral_feedforward = quick_turn_feedforward * 0.45f * lateral_balance;
+        quick_out = quick_turn_feedforward * normalized_error + lateral_feedforward;
     }
 
     // 连续左右急弯或换向时，额外给出“反打”前馈，提前让舵机回中换向
@@ -79,7 +85,7 @@ void set_servo_pwm()
             straight_ratio = roundabout_straight_ratio_high;
         }
         else if (roundabout_timer > (ROUNDABOUT_HOLD_TIME / 3)) {
-            straight_ratio = (roundabout_straight_ratio_high + roundabout_straight_ratio_low) * 0.5f;
+            straight_ratio = (roundabout_straight_ratio_high + roundabout_straight_ratio_low) * 0.25f;
         }
 
         float entry_offset_limit = roundabout_entry_offset_min + (roundabout_entry_offset_max - roundabout_entry_offset_min) * (1.0f - straight_ratio);
