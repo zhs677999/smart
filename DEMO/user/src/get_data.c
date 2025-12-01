@@ -13,7 +13,7 @@ adc_channel_enum channel_list[ADC_CHANNEL_NUMBER] =
 {
     ADC_CHANNEL1, ADC_CHANNEL2, ADC_CHANNEL3, ADC_CHANNEL4,
 };
-uint16_t adc_buffer[ADC_CHANNEL_NUMBER];
+uint16_t raw_adc[ADC_CHANNEL_NUMBER];
 
 // 滤波与归一化后的数据
 float filtered_adc[ADC_CHANNEL_NUMBER] = {0};
@@ -22,12 +22,14 @@ float normalized_error = 0; // 归一化差值，左大于右为正
 
 // 检测状态
 uint8_t finish_detected = 0;
+uint8_t off_track_detected = 0;
 uint8_t roundabout_detected = 0;
 uint16_t roundabout_timer = 0;
 uint16_t roundabout_cooldown = 0;
 
 // 内部计时与防抖
 static uint16_t finish_counter = 0;
+static uint16_t off_track_counter = 0;
 static uint16_t roundabout_counter = 0;
 
 // -------------------------------------------------------------
@@ -47,7 +49,7 @@ static void get_adc()
 {
     for(channel_index = 0; channel_index < ADC_CHANNEL_NUMBER; channel_index ++)
     {
-        adc_buffer[channel_index] = adc_convert(channel_list[channel_index]);
+        raw_adc[channel_index] = adc_convert(channel_list[channel_index]);
     }
 }
 
@@ -56,7 +58,7 @@ static void filter_adc(void)
 {
     for(channel_index = 0; channel_index < ADC_CHANNEL_NUMBER; channel_index ++)
     {
-        float raw = (float)adc_buffer[channel_index];
+        float raw = (float)raw_adc[channel_index];
         filtered_adc[channel_index] = FILTER_ALPHA * filtered_adc[channel_index] + (1.0f - FILTER_ALPHA) * raw;
     }
 }
@@ -72,6 +74,37 @@ static void normalize_adc(void)
     }
 
     normalized_error = normalized_adc[0] - normalized_adc[3];
+}
+
+// 失线检测：四路原始值同时低于阈值则判定为超出跑道
+static void off_track_detect(void)
+{
+    uint8_t all_low = 1;
+    for(channel_index = 0; channel_index < ADC_CHANNEL_NUMBER; channel_index ++)
+    {
+        if(raw_adc[channel_index] >= OFF_TRACK_THRESHOLD_RAW)
+        {
+            all_low = 0;
+            break;
+        }
+    }
+
+    if(all_low)
+    {
+        if(off_track_counter < 0xFFFF)
+        {
+            off_track_counter++;
+        }
+    }
+    else
+    {
+        off_track_counter = 0;
+    }
+
+    if(off_track_counter >= OFF_TRACK_DEBOUNCE)
+    {
+        off_track_detected = 1;
+    }
 }
 
 // 终点检测：四路同时高亮并持续若干周期
@@ -117,23 +150,32 @@ static void update_roundabout_alert(void)
     }
 }
 
-// 环岛检测：使用中间两路的强弱组合防止一般急弯误判
+// 环岛检测：匹配接近环岛的原始值特征，避免与急弯/十字路混淆
 static void roundabout_detect(void)
 {
-    float mid_norm_left  = normalized_adc[1];
-    float mid_norm_right = normalized_adc[2];
-    // 映射原始阈值（3500 高，1000 低）到归一化范围
-    float high_gate = 3500.0f / ADC_FULL_SCALE;
-    float low_gate  = 1000.0f / ADC_FULL_SCALE;
+    uint16_t left_outer   = raw_adc[0];
+    uint16_t left_middle  = raw_adc[1];
+    uint16_t right_middle = raw_adc[2];
+    uint16_t right_outer  = raw_adc[3];
 
     if(roundabout_cooldown > 0)
     {
         roundabout_cooldown--;
     }
 
-    // 仅在一高一低的强弱组合出现时累计计数
-    if(((mid_norm_left  > high_gate) && (mid_norm_right < low_gate)) ||
-       ((mid_norm_right > high_gate) && (mid_norm_left  < low_gate)))
+    // 模式 1：接近环岛时，中右迅速变暗且两侧保持亮度（2290/1435/77/2024，3602/3237/79/2421）
+    uint8_t approach_pattern = (right_middle <= ROUNDABOUT_RAW_GAP_SOFT) &&
+                               (left_outer  >= ROUNDABOUT_OUTER_L_HIGH) &&
+                               (right_outer >= ROUNDABOUT_OUTER_R_HIGH) &&
+                               (left_middle >= ROUNDABOUT_MID_HIGH);
+
+    // 模式 2：到切点时，中左短暂变暗但左右外侧冲高（3420/443/111/3146，3585/1957/403/2986）
+    uint8_t tangent_pattern = (right_middle <= ROUNDABOUT_RAW_GAP_STRONG) &&
+                              (left_middle  <= ROUNDABOUT_MID_HIGH) &&
+                              (left_outer   >= ROUNDABOUT_LEFT_SPIKE) &&
+                              (right_outer  >= ROUNDABOUT_RIGHT_SUPPORT);
+
+    if(approach_pattern || tangent_pattern)
     {
         if(roundabout_counter < 0xFFFF)
         {
@@ -172,6 +214,7 @@ void process_sensor_data(void)
 {
     get_encoder();
     get_adc();
+    off_track_detect();
     filter_adc();
     normalize_adc();
     finish_line_detect();
