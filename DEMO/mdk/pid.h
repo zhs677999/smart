@@ -1,0 +1,27 @@
+#ifndef _PID_H_
+#define _PID_H_
+
+#include "zf_common_headfile.h"
+
+typedef struct {
+    float kp;           // ????
+    float ki;           // ????
+    float kd;           // ????
+    
+    float error;        // ????
+    float last_error;   // ?????
+    float prev_error;   // ?????(?????)
+    
+    float integral;     // ?????(?????)
+    float output;       // PID???
+    
+    float max_output;   // ????
+    float max_integral; // ????
+} PID_TypeDef;
+
+// ????
+void PID_Init(PID_TypeDef *pid, float kp, float ki, float kd, float max_out, float max_int);
+float PID_Calc_Positional(PID_TypeDef *pid, float target, float feedback); // ???(????,??????PD)
+float PID_Calc_Incremental(PID_TypeDef *pid, float target, float feedback); // ???(??????)
+
+#endif

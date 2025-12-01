@@ -1,0 +1,64 @@
+# 忽略编译生成的文件和文件夹
+/build/
+/bin/
+/obj/
+/out/
+/*.o
+/*.a
+/*.so
+/*.exe
+/*.dll
+
+# 忽略临时文件
+*.log
+*.bak
+*.swp
+*.tmp
+
+# 忽略编辑器和IDE相关的文件
+# VSCode
+.vscode/
+
+# IntelliJ IDEA
+.idea/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# 忽略依赖和包管理相关的文件
+/node_modules/
+/bower_components/
+/packages/
+
+# 忽略 Python 环境相关文件
+*.pyc
+*.pyo
+__pycache__/
+
+# 忽略虚拟环境
+env/
+venv/
+
+# 忽略操作系统生成的文件
+.DS_Store     # macOS
+Thumbs.db     # Windows
+
+# 忽略敏感数据文件（例如密钥、API密钥等）
+*.pem
+*.key
+*.env
+
+# 忽略 Git 合并冲突时产生的临时文件
+*.orig
+
+# 如果你的项目包含模型、配置文件等较大文件，可以根据需求选择忽略
+# 例如，忽略机器学习模型文件（如果有的话）
+# *.h5
+# *.pth
+
+# 如果你有其他特定的配置文件，也可以在此处添加
+# 例如，忽略硬件相关配置文件
+hardware_config.json
+zhs
