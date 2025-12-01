@@ -12,6 +12,8 @@
    - `get_adc` 轮询四路循迹传感器。
    - `filter_adc` 使用一阶低通（系数 `FILTER_ALPHA`）抑制抖动。
 3. **归一化**：`normalize_adc` 以 `ADC_FULL_SCALE` 归一化到 0~1，并计算左右差值 `normalized_error = left - right`。
+   - 选用差值（difference）而非比值（ratio），避免分母接近 0 时放大噪声，也便于在左右光强接近饱和或过暗时保持线性响应；
+   - 如果赛道或传感器布局导致左右幅值差异巨大、易饱和，可考虑改为 `(left - right) / max(left + right, eps)` 的归一化比值，但需要针对空白底板做额外滤波与阈值调整。
 4. **终点检测**：`finish_line_detect` 判断四路同时高亮且持续 `FINISH_DEBOUNCE` 个周期后拉高 `finish_detected`。
 5. **环岛检测**：`roundabout_detect` 检查两侧是否高于 `ROUNDABOUT_THRESHOLD`，计数超过 `ROUNDABOUT_DEBOUNCE` 且冷却结束后，
    - 置位 `roundabout_detected`；
