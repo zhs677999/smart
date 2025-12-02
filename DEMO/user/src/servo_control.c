@@ -36,6 +36,8 @@ static const float roundabout_entry_offset_max = 38.0f;
 // 环岛检测后的一段惰性变向，防止刚识别时因外侧抖动又拐回
 static const float roundabout_inertia_blend_soft   = 0.80f;
 static const float roundabout_inertia_blend_strong = 0.92f;
+static const float roundabout_inertia_kp_scale     = 0.72f;  // 惰性阶段降低比例响应，避免超调
+static const float roundabout_inertia_quick_scale  = 0.60f;  // 惰性阶段削弱快速前馈
 // -----------------------------------------------------------
 
 extern float normalized_error;      // 归一化后的左右差值
@@ -101,6 +103,11 @@ void set_servo_pwm()
     float adaptive_kp = kp_local;
     if ((fabsf(normalized_error) > sharp_turn_error) || (fabsf(lateral_balance) > 0.38f)) {
         adaptive_kp *= sharp_turn_gain;
+    }
+
+    if(roundabout_detected && roundabout_inertia_timer > 0)
+    {
+        adaptive_kp *= roundabout_inertia_kp_scale;
     }
 
     float enhanced_error = normalized_error * error_gain;
@@ -181,6 +188,13 @@ void set_servo_pwm()
     // 直道时屏蔽快速前馈，防止微小误差也触发大幅反打
     if (fabsf(normalized_error) < straight_error_band && fabsf(error_delta) < straight_delta_band) {
         quick_out = 0.0f;
+    }
+
+    // 环岛惰性阶段：抑制前馈幅度，防止刚识别时反向超调
+    if(roundabout_detected && roundabout_inertia_timer > 0)
+    {
+        quick_out *= roundabout_inertia_quick_scale;
+        quick_out_cap = fminf(quick_out_cap, quick_out_limit_deg - 2.0f);
     }
 
     // 掉头弯换向软化：暂时削弱前馈，防止直接把舵机打到反方向极限
