@@ -26,6 +26,7 @@
 1. **误差预处理**：
    - 对误差使用分段增益，`|error| > 0.2` 时放大到 `1.5×`，提升小角度灵敏度。
    - 锐角弯（`|error| > 0.32`）时动态提升 `kp` 到 `sharp_turn_gain` 倍。
+   - 直道附近（误差与变化量都很小）自动压低 D 项并关闭快速前馈，输出再与上一周期粘滞插值，避免舵机反复左右抖动。
 2. **PD+前馈输出**：
    - `p_out = kp * enhanced_error`；`d_out = kd * (error_delta)`（`kd` 现为 6.5，响应更快）。
    - 大误差时添加 `quick_turn_feedforward` 前馈；
@@ -36,6 +37,15 @@
 4. **限幅与输出**：
    - 舵机角度限制在 `SERVO_MOTOR_L_MAX` ~ `SERVO_MOTOR_R_MAX`；
    - 通过三路 PWM 同步输出到舵机。
+
+## 环岛易漏检的调试思路
+若车辆进入环岛时速度过快，外圈未跟上导致检测不到，可以按以下两种方案择一（或结合）调试：
+1. **延长环岛保持/绕行计时**（更宽松的时间窗口容错）：
+   - 在 `DEMO/user/inc/my_common.h` 中增加 `ROUNDABOUT_HOLD_TIME`（进入后保持直行的时间）、`ROUNDABOUT_LAP_MIN_TIME`（至少绕行多久再找出口）或 `ROUNDABOUT_EXIT_CONFIRM`（出口模式防抖计数）。
+   - 逐步把计时参数各自提高 10%~20%，实车测试到能稳定进入/识别出口为止。
+2. **降低环岛段速度**（让传感器有充足时间采样特征）：
+   - 在同一文件减小 `ROUNDABOUT_SPEED_DUTY` 或 `TARGET_COUNT_ROUNDABOUT`，必要时也可以略降 `CURVE_SPEED_DUTY`，保证进环岛前就提前减速。
+   - 每次下调 2~4 个 duty 或 5% 的编码器目标，测试环岛是否能稳定触发，避免降速过度影响直道成绩。
 
 ## 速度控制（`DEMO/user/src/speed_control.c`）
 1. **分段目标占空比**：

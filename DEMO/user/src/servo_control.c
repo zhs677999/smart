@@ -48,6 +48,11 @@ void set_servo_pwm()
     float kp_local = 180.0f;
     float kd_local = 60.0f;
 
+    // 直道稳定器：在误差很小且变化不剧烈时，减小 D 项与前馈，避免来回抖动
+    const float straight_error_band = 0.08f;
+    const float straight_delta_band = 0.10f;
+    const float straight_settle_ratio = 0.82f; // 越大越贴合上一次输出
+
     // 动态 PID：误差较大时提高响应
     if (fabsf(normalized_error) > 0.2f) {
         kp_local = 230.0f;  // 大误差时更激进
@@ -123,6 +128,11 @@ void set_servo_pwm()
         sustained_turn_sign = current_sign;
     }
 
+    // 直道抑制 D 项，避免轻微噪声触发反复回正
+    if (fabsf(normalized_error) < straight_error_band && fabsf(error_delta) < straight_delta_band) {
+        kd_local *= 0.35f;
+    }
+
     float p_out = adaptive_kp * enhanced_error;
     float d_out = kd_local * error_delta * (hairpin_settle_timer ? hairpin_damping : 1.0f);
 
@@ -139,6 +149,11 @@ void set_servo_pwm()
         quick_out += sign_flip_boost * enhanced_error;
     }
 
+    // 直道时屏蔽快速前馈，防止微小误差也触发大幅反打
+    if (fabsf(normalized_error) < straight_error_band && fabsf(error_delta) < straight_delta_band) {
+        quick_out = 0.0f;
+    }
+
     // 掉头弯换向软化：暂时削弱前馈，防止直接把舵机打到反方向极限
     if(hairpin_settle_timer > 0)
     {
@@ -150,6 +165,11 @@ void set_servo_pwm()
     if (quick_out < -quick_out_limit_deg) quick_out = -quick_out_limit_deg;
 
     float commanded_angle = SERVO_MOTOR_M - (p_out + d_out + quick_out);
+
+    // 直道稳态：输出向上一周期粘滞，防止在小误差附近左右抖动
+    if (fabsf(normalized_error) < straight_error_band && fabsf(error_delta) < straight_delta_band) {
+        commanded_angle = servo_motor_angle * straight_settle_ratio + commanded_angle * (1.0f - straight_settle_ratio);
+    }
 
     // 环岛进入：先保持直行，然后按计时器渐进恢复正常控制，同时限制最大偏转角，防止过早偏航
     if (roundabout_detected && roundabout_timer > 0) {
