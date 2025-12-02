@@ -66,6 +66,7 @@
 #define ROUNDABOUT_DEBOUNCE         (25)
 #define ROUNDABOUT_HOLD_TIME        (200)
 #define ROUNDABOUT_COOLDOWN         (300)
+#define ROUNDABOUT_INERTIA_TIME     (160)   // 检测环岛后的惰性变向时长（平滑方向切换，防止提前跑出）
 // 环岛绕行逻辑
 #define ROUNDABOUT_LAP_MIN_TIME     (500)   // 需要至少绕行一段时间后再寻找出口
 #define ROUNDABOUT_MAX_LAP_TIME     (1600)  // 超时保护，防止一直卡在环岛状态

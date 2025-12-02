@@ -33,6 +33,9 @@ static const float roundabout_straight_ratio_low  = 0.15f;
 // 环岛阶段允许的最大偏转角，先小后大，避免提前偏航
 static const float roundabout_entry_offset_min = 10.0f;
 static const float roundabout_entry_offset_max = 38.0f;
+// 环岛检测后的一段惰性变向，防止刚识别时因外侧抖动又拐回
+static const float roundabout_inertia_blend_soft   = 0.80f;
+static const float roundabout_inertia_blend_strong = 0.92f;
 // -----------------------------------------------------------
 
 extern float normalized_error;      // 归一化后的左右差值
@@ -44,11 +47,29 @@ extern uint16_t roundabout_lap_timer;
 static uint16_t sustained_turn_ticks = 0;   // 同向大幅转弯持续时间
 static int8_t sustained_turn_sign = 0;       // 最近一次持续转弯的方向
 static uint16_t hairpin_settle_timer = 0;    // 掉头弯换向后的软化计时
+static uint16_t roundabout_inertia_timer = 0; // 环岛检测后的惰性变向计时
+static uint8_t last_roundabout_state = 0;
 
 void set_servo_pwm()
 {
     float kp_local = 180.0f;
     float kd_local = 60.0f;
+
+    // 环岛识别后开启一段惰性变向计时，防止刚进入时因外圈抖动又快速回头
+    if(roundabout_detected && !last_roundabout_state)
+    {
+        roundabout_inertia_timer = ROUNDABOUT_INERTIA_TIME;
+    }
+    else if(!roundabout_detected)
+    {
+        roundabout_inertia_timer = 0;
+    }
+    last_roundabout_state = roundabout_detected;
+
+    if(roundabout_inertia_timer > 0)
+    {
+        roundabout_inertia_timer--;
+    }
 
     // 直道稳定器：在误差很小且变化不剧烈时，减小 D 项与前馈，避免来回抖动
     const float straight_error_band = 0.08f;
@@ -202,6 +223,17 @@ void set_servo_pwm()
 
         float softened_angle = SERVO_MOTOR_M + deviation_from_center;
         commanded_angle = SERVO_MOTOR_M * straight_ratio + softened_angle * (1.0f - straight_ratio);
+    }
+
+    // 环岛识别后的惰性变向：短时间内对舵机命令做平滑，抑制突然反打导致的“跑出环岛”
+    if(roundabout_detected && roundabout_inertia_timer > 0)
+    {
+        float inertia_blend = roundabout_inertia_blend_soft;
+        if((servo_motor_angle - SERVO_MOTOR_M) * (commanded_angle - SERVO_MOTOR_M) < 0.0f)
+        {
+            inertia_blend = roundabout_inertia_blend_strong; // 跨过中值要更粘滞
+        }
+        commanded_angle = servo_motor_angle * inertia_blend + commanded_angle * (1.0f - inertia_blend);
     }
 
     servo_motor_angle = commanded_angle;
