@@ -36,9 +36,9 @@ typedef struct
 // 统一的调参表，配合状态机一眼能看到各工况参数
 static const steering_profile_t steering_profiles[] =
 {
-    [STEER_STRAIGHT]     = {100.0f, 20.0f,   0.0f,  0.0f, 0.25f, 0.84f}, // 直道：低前馈、强粘滞，抑制抖动
-    [STEER_EASY_LEFT]    = {130.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f}, // 缓左：适中 PD 与前馈，略做平滑
-    [STEER_EASY_RIGHT]   = {130.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f}, // 缓右：同上对称
+    [STEER_STRAIGHT]     = {70.0f,  20.0f,   0.0f,  0.0f, 0.25f, 0.84f}, // 直道：低增益+高粘滞，抑制抖动
+    [STEER_EASY_LEFT]    = {120.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f}, // 缓左：适中 PD 与前馈，略做平滑
+    [STEER_EASY_RIGHT]   = {120.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f}, // 缓右：同上对称
     [STEER_HARD_LEFT]    = {280.0f, 70.0f, 280.0f, 24.0f, 1.10f, 0.00f}, // 急左：高增益与大前馈，无粘滞便于快速入弯
     [STEER_HARD_RIGHT]   = {280.0f, 70.0f, 280.0f, 24.0f, 1.10f, 0.00f}, // 急右：同上对称
     [STEER_ROUND_HOLD]   = {110.0f,  0.0f,   0.0f,  0.0f, 0.00f, 0.92f}, // 入环保持直行：低增益+高粘滞，配合锁死角度

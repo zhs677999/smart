@@ -51,8 +51,8 @@
 
 #define SERVO_MOTOR_FREQ            (50)                                           // 舵机频率，范围 50-300
 
-#define SERVO_MOTOR_L_MAX           (80)                                           // 左转极限
-#define SERVO_MOTOR_R_MAX           (100)                                          // 右转极限
+#define SERVO_MOTOR_L_MAX           (76)                                           // 左转极限
+#define SERVO_MOTOR_R_MAX           (104)                                          // 右转极限
 #define SERVO_MOTOR_M               (90)                                           // 中值
 
 #define SERVO_MOTOR_DUTY(x)         ((float)PWM_DUTY_MAX/(1000.0/(float)SERVO_MOTOR_FREQ)*(0.5+(float)(x)/90.0))
