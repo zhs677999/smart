@@ -70,6 +70,11 @@
 #define ROUNDABOUT_LAP_MIN_TIME     (500)   // 需要至少绕行一段时间后再寻找出口
 #define ROUNDABOUT_MAX_LAP_TIME     (1600)  // 超时保护，防止一直卡在环岛状态
 #define ROUNDABOUT_EXIT_CONFIRM     (18)    // 检测到出口模式的防抖计数
+#define ROUNDABOUT_EXIT_GAP_SOFT    (0.38f) // 绕行一圈后的出口放宽：允许更暗的中右
+#define ROUNDABOUT_EXIT_LEFT_MIN    (0.50f) // 仍需保持外圈亮度，避免误将急弯识别为出口
+#define ROUNDABOUT_EXIT_RIGHT_MIN   (0.40f)
+#define ROUNDABOUT_EXIT_OUTER_DIFF  (0.20f)
+#define ROUNDABOUT_EXIT_MID_DIFF    (0.14f)
 // 环岛判定：结合原始值特征，避免与急弯/十字路混淆
 #define ROUNDABOUT_RAW_GAP_STRONG   (180)   // 中右传感器极低，进环岛标志
 #define ROUNDABOUT_RAW_GAP_SOFT     (500)   // 中右明显变暗

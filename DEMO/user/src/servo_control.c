@@ -26,6 +26,7 @@ static const float hairpin_damping          = 0.55f;   // 软化期降低 D 项�
 static const float hairpin_quick_scale      = 0.35f;   // 软化期削弱快速前馈
 // 限制快速前馈的量级，避免在连续急弯时过度回正
 static const float quick_out_limit_deg = 22.0f;
+static const float s_bend_extra_quick  = 6.0f;    // 反向急转弯时允许更大的快速前馈，防止出弯
 // 环岛进入时的舵机直行保持比例（靠计时器逐渐退出）
 static const float roundabout_straight_ratio_high = 0.45f;
 static const float roundabout_straight_ratio_low  = 0.15f;
@@ -39,6 +40,7 @@ extern float normalized_adc[ADC_CHANNEL_NUMBER];
 float last_adc_error = 0;           // 上一次误差（用于 D 项与换向检测）
 extern uint8_t roundabout_detected;
 extern uint16_t roundabout_timer;
+extern uint16_t roundabout_lap_timer;
 static uint16_t sustained_turn_ticks = 0;   // 同向大幅转弯持续时间
 static int8_t sustained_turn_sign = 0;       // 最近一次持续转弯的方向
 static uint16_t hairpin_settle_timer = 0;    // 掉头弯换向后的软化计时
@@ -143,6 +145,12 @@ void set_servo_pwm()
         quick_out = quick_turn_feedforward * normalized_error + lateral_feedforward;
     }
 
+    // 反向连续急弯：放宽快速前馈限制，让第二个急弯能更快贴近赛道
+    float quick_out_cap = quick_out_limit_deg;
+    if ((enhanced_error * last_adc_error < 0.0f) && (fabsf(enhanced_error) > sign_flip_threshold) && (hairpin_settle_timer == 0)) {
+        quick_out_cap += s_bend_extra_quick;
+    }
+
     // 连续左右急弯或换向时，额外给出“反打”前馈，提前让舵机回中换向
     if ((enhanced_error * last_adc_error < 0.0f) && (fabsf(enhanced_error) > sign_flip_threshold) && (hairpin_settle_timer == 0)) {
         // 二次急弯时回正更温和，避免过度反打
@@ -160,9 +168,14 @@ void set_servo_pwm()
         quick_out *= hairpin_quick_scale;
     }
 
+    // 环岛绕行接近一圈后，允许更大的前馈幅度，以便迅速“拉”出出口
+    if (roundabout_detected && (roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME)) {
+        quick_out_cap += 4.0f;
+    }
+
     // 限制快速前馈幅度，防止占满舵机行程导致第二个急弯出不去
-    if (quick_out > quick_out_limit_deg) quick_out = quick_out_limit_deg;
-    if (quick_out < -quick_out_limit_deg) quick_out = -quick_out_limit_deg;
+    if (quick_out > quick_out_cap) quick_out = quick_out_cap;
+    if (quick_out < -quick_out_cap) quick_out = -quick_out_cap;
 
     float commanded_angle = SERVO_MOTOR_M - (p_out + d_out + quick_out);
 

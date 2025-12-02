@@ -19,7 +19,8 @@
    - 置位 `roundabout_detected`；
    - 启动 `roundabout_timer = ROUNDABOUT_HOLD_TIME`；
    - 开启冷却 `roundabout_cooldown` 防止重复触发；
-   - 根据状态点亮/熄灭 `LED1` 作为提示。
+   - 根据状态点亮/熄灭 `LED1` 作为提示；
+   - 绕行一圈寻找出口时，除原有特征外还开启“出口放宽”通道（`ROUNDABOUT_EXIT_*`），在亮度偏低或距离稍远时也能计数退出，避免卡在环岛内。
 6. **速度目标选择**：`get_target_count_from_state` 根据当前状态切换三档编码器目标：直道、弯道、环岛/终点限速。
 
 ## 舵机控制（`DEMO/user/src/servo_control.c`）
@@ -30,7 +31,8 @@
 2. **PD+前馈输出**：
    - `p_out = kp * enhanced_error`；`d_out = kd * (error_delta)`（`kd` 现为 6.5，响应更快）。
    - 大误差时添加 `quick_turn_feedforward` 前馈；
-   - 若本周期与上周期误差符号相反且幅值超过 `sign_flip_threshold`，叠加 `sign_flip_boost` 作为“反打”前馈，专门加速连续左右急弯的回中与换向。
+   - 若本周期与上周期误差符号相反且幅值超过 `sign_flip_threshold`，叠加 `sign_flip_boost` 作为“反打”前馈，专门加速连续左右急弯的回中与换向；
+   - 判定为反向连续急弯或环岛绕行接近一圈时，会放宽前馈限幅上限，确保第二个急弯/环岛出口时能更快贴线而不外飘。
 3. **环岛进入辅助**：
    - 检测到环岛且计时未归零时，计算 `straight_ratio`（先大后小）让转向从直行平滑过渡回正常；
    - 同时按计时动态限制最大偏转角（`10°→28°`），避免过早偏航，保障车辆先进入环岛再恢复寻线。

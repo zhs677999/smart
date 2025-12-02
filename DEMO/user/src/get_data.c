@@ -190,6 +190,14 @@ static void roundabout_detect(void)
                            ((left_middle_norm - right_middle_norm) > 0.22f) &&
                            ((left_outer_norm  - right_middle_norm) > 0.28f);
 
+    // 出口放宽：绕行达到最小时长后，允许更宽松的亮暗组合触发出口计数，避免卡在环岛内
+    uint8_t soft_exit_pattern = (roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME) &&
+                                (right_middle_norm < ROUNDABOUT_EXIT_GAP_SOFT) &&
+                                (left_outer_norm  > ROUNDABOUT_EXIT_LEFT_MIN) &&
+                                (right_outer_norm > ROUNDABOUT_EXIT_RIGHT_MIN) &&
+                                ((left_outer_norm - right_middle_norm) > ROUNDABOUT_EXIT_OUTER_DIFF) &&
+                                ((left_middle_norm - right_middle_norm) > ROUNDABOUT_EXIT_MID_DIFF);
+
     if(!roundabout_detected)
     {
         if(approach_pattern || tangent_pattern || adaptive_gap)
@@ -226,7 +234,7 @@ static void roundabout_detect(void)
             roundabout_lap_timer++;
         }
 
-        uint8_t exit_pattern = approach_pattern || tangent_pattern || adaptive_gap; // 绕行一圈后出口会再次出现这些亮暗组合
+        uint8_t exit_pattern = approach_pattern || tangent_pattern || adaptive_gap || soft_exit_pattern; // 绕行一圈后出口会再次出现这些亮暗组合
 
         if(roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME && exit_pattern)
         {
