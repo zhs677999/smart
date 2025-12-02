@@ -81,6 +81,9 @@ static int8_t sustained_turn_sign = 0;       // 最近一次持续转弯的方�
 static uint16_t hairpin_settle_timer = 0;    // 掉头弯换向后的软化计时
 static uint16_t roundabout_inertia_timer = 0; // 环岛检测后的惰性变向计时
 static uint8_t last_roundabout_state = 0;
+static uint16_t roundabout_lock_timer = 0;    // 入环开环锁死计时
+static uint16_t roundabout_exit_timer = 0;    // 出环开环计时
+static int8_t roundabout_lock_sign = 0;       // 入环锁死的方向
 
 static steering_state_t classify_state(float error, float delta)
 {
@@ -134,14 +137,28 @@ static float apply_entry_hold(float commanded_angle)
 
 void set_servo_pwm()
 {
-    // 环岛识别后的惰性计时
+    float error = normalized_error;
+    float error_delta = error - last_adc_error;
+
+    // 环岛事件：入环锁死/出环开环
     if(roundabout_detected && !last_roundabout_state)
     {
         roundabout_inertia_timer = ROUNDABOUT_INERTIA_TIME;
+        roundabout_lock_timer = ROUNDABOUT_LOCK_TIME;
+        roundabout_exit_timer = 0;
+        if(fabsf(error) > 0.01f)
+        {
+            roundabout_lock_sign = (error > 0.0f) ? 1 : -1;
+        }
+        else
+        {
+            roundabout_lock_sign = (servo_motor_angle >= SERVO_MOTOR_M) ? -1 : 1;
+        }
     }
-    else if(!roundabout_detected)
+    else if(!roundabout_detected && last_roundabout_state)
     {
-        roundabout_inertia_timer = 0;
+        roundabout_exit_timer = ROUNDABOUT_EXIT_TIME;
+        roundabout_lock_timer = 0;
     }
     last_roundabout_state = roundabout_detected;
 
@@ -150,14 +167,52 @@ void set_servo_pwm()
         roundabout_inertia_timer--;
     }
 
+    if(roundabout_lock_timer > 0)
+    {
+        roundabout_lock_timer--;
+    }
+
+    if(roundabout_exit_timer > 0 && !roundabout_detected)
+    {
+        roundabout_exit_timer--;
+    }
+
     // 掉头弯检测计时
     if(hairpin_settle_timer > 0)
     {
         hairpin_settle_timer--;
     }
 
-    float error = normalized_error;
-    float error_delta = error - last_adc_error;
+    // 入环锁死或出环开环：直接开环输出并跳过闭环计算
+    if(roundabout_lock_timer > 0 && roundabout_lock_sign != 0)
+    {
+        float commanded_angle = SERVO_MOTOR_M - roundabout_lock_sign * ROUNDABOUT_LOCK_ANGLE;
+        servo_motor_angle = commanded_angle;
+        last_adc_error = error;
+
+        if(servo_motor_angle > SERVO_MOTOR_R_MAX) servo_motor_angle = SERVO_MOTOR_R_MAX;
+        if(servo_motor_angle < SERVO_MOTOR_L_MAX) servo_motor_angle = SERVO_MOTOR_L_MAX;
+
+        pwm_set_duty(SERVO_MOTOR1_PWM, (uint32)SERVO_MOTOR_DUTY(servo_motor_angle));
+        pwm_set_duty(SERVO_MOTOR2_PWM, (uint32)SERVO_MOTOR_DUTY(servo_motor_angle));
+        pwm_set_duty(SERVO_MOTOR3_PWM, (uint32)SERVO_MOTOR_DUTY(servo_motor_angle));
+        return;
+    }
+
+    if(roundabout_exit_timer > 0 && roundabout_lock_sign != 0)
+    {
+        float commanded_angle = SERVO_MOTOR_M - roundabout_lock_sign * ROUNDABOUT_EXIT_ANGLE;
+        servo_motor_angle = commanded_angle;
+        last_adc_error = error;
+
+        if(servo_motor_angle > SERVO_MOTOR_R_MAX) servo_motor_angle = SERVO_MOTOR_R_MAX;
+        if(servo_motor_angle < SERVO_MOTOR_L_MAX) servo_motor_angle = SERVO_MOTOR_L_MAX;
+
+        pwm_set_duty(SERVO_MOTOR1_PWM, (uint32)SERVO_MOTOR_DUTY(servo_motor_angle));
+        pwm_set_duty(SERVO_MOTOR2_PWM, (uint32)SERVO_MOTOR_DUTY(servo_motor_angle));
+        pwm_set_duty(SERVO_MOTOR3_PWM, (uint32)SERVO_MOTOR_DUTY(servo_motor_angle));
+        return;
+    }
 
     // 统计同向持续计时
     int8_t current_sign = (error > 0.0f) - (error < 0.0f);

@@ -15,10 +15,9 @@
    - 选用差值（difference）而非比值（ratio），避免分母接近 0 时放大噪声，也便于在左右光强接近饱和或过暗时保持线性响应；
    - 如果赛道或传感器布局导致左右幅值差异巨大、易饱和，可考虑改为 `(left - right) / max(left + right, eps)` 的归一化比值，但需要针对空白底板做额外滤波与阈值调整。
 4. **终点检测**：`finish_line_detect` 判断四路同时高亮且持续 `FINISH_DEBOUNCE` 个周期后拉高 `finish_detected`。
-5. **环岛检测**：`roundabout_detect` 检查两侧是否高于 `ROUNDABOUT_THRESHOLD`，计数超过 `ROUNDABOUT_DEBOUNCE` 且冷却结束后，
-   - 置位 `roundabout_detected`；
-   - 启动 `roundabout_timer = ROUNDABOUT_HOLD_TIME`；
-   - 开启冷却 `roundabout_cooldown` 防止重复触发；
+5. **环岛检测**：`roundabout_detect` 采用“电感特征 + 编码器速度/里程”双重验证：
+   - ADC 检出环岛特征后，只有当编码器平均速度 ≥ `ROUNDABOUT_ENCODER_SPEED_MIN` 且距离上次环岛判定累积行程 ≥ `ROUNDABOUT_ENCODER_TRAVEL_MIN` 才会生效；
+   - 触发后置位 `roundabout_detected`，启动 `roundabout_timer = ROUNDABOUT_HOLD_TIME`，开启冷却 `roundabout_cooldown` 并重置里程计数；
    - 根据状态点亮/熄灭 `LED1` 作为提示；
    - 绕行一圈寻找出口时，除原有特征外还开启“出口放宽”通道（`ROUNDABOUT_EXIT_*`），在亮度偏低或距离稍远时也能计数退出，避免卡在环岛内。
 6. **速度目标选择**：`get_target_count_from_state` 根据当前状态切换三档编码器目标：直道、弯道、环岛/终点限速。
@@ -30,8 +29,9 @@
 2. **掉头/反向急弯软化**：
    - 长时间同向高误差后突然换向会触发软化计时，D 项与前馈都会衰减，避免把连续发夹弯当成“来回反打”。
 3. **环岛辅助**：
-   - 触发环岛后先执行“直行保持+偏转限幅”，计时结束再恢复正常 PID，防止提前偏航；
-   - 识别后的惯性窗口会整体降低增益并对跨中值指令做更强粘滞，避免刚识别时抖动把车反向打出入口；
+   - 触发环岛即锁定打死方向（`ROUNDABOUT_LOCK_ANGLE`，持续 `ROUNDABOUT_LOCK_TIME`），开环拉车入环；
+   - 识别出口后继续按同向开环角度（`ROUNDABOUT_EXIT_ANGLE`，持续 `ROUNDABOUT_EXIT_TIME`）拉出出口；
+   - 惰性变向默认关闭（`ROUNDABOUT_INERTIA_TIME=0`），如需叠加可调大该值，锁死阶段会直接跳过惰性平滑；
    - 绕行达到最小时长后自动切换到出口状态，前馈限幅略放宽，帮助迅速拉出出口。
 4. **输出与限幅**：
    - 直道/惰性阶段按粘滞系数与上一周期平滑过渡；

@@ -66,7 +66,13 @@
 #define ROUNDABOUT_DEBOUNCE         (25)
 #define ROUNDABOUT_HOLD_TIME        (200)
 #define ROUNDABOUT_COOLDOWN         (300)
-#define ROUNDABOUT_INERTIA_TIME     (160)   // 检测环岛后的惰性变向时长（平滑方向切换，防止提前跑出）
+#define ROUNDABOUT_INERTIA_TIME     (0)     // 默认关闭惰性变向，改为锁死入环/出环
+#define ROUNDABOUT_ENCODER_SPEED_MIN (40)   // 编码器速度下限：与电感双重验证环岛
+#define ROUNDABOUT_ENCODER_TRAVEL_MIN (320) // 两次环岛判定之间至少行进的编码器计数
+#define ROUNDABOUT_LOCK_ANGLE       (20.0f) // 入环时锁定打死的角度
+#define ROUNDABOUT_LOCK_TIME        (160)   // 入环锁死持续时间（控制周期计）
+#define ROUNDABOUT_EXIT_ANGLE       (16.0f) // 出环时保持的开环角度
+#define ROUNDABOUT_EXIT_TIME        (120)   // 出环开环持续时间
 // 环岛绕行逻辑
 #define ROUNDABOUT_LAP_MIN_TIME     (500)   // 需要至少绕行一段时间后再寻找出口
 #define ROUNDABOUT_MAX_LAP_TIME     (1600)  // 超时保护，防止一直卡在环岛状态

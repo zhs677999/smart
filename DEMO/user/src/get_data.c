@@ -33,6 +33,7 @@ static uint16_t finish_counter = 0;
 static uint16_t off_track_counter = 0;
 static uint16_t roundabout_counter = 0;
 static uint16_t roundabout_exit_counter = 0;
+static uint32_t travel_since_roundabout = 0;
 
 // -------------------------------------------------------------
 
@@ -155,6 +156,9 @@ static void update_roundabout_alert(void)
 // 环岛检测：匹配接近环岛的原始值特征，避免与急弯/十字路混淆；进入后绕一圈再退出
 static void roundabout_detect(void)
 {
+    float encoder_speed = (fabsf((float)encoder_data_1) + fabsf((float)encoder_data_2)) * 0.5f;
+    travel_since_roundabout += (uint32_t)(fabsf((float)encoder_data_1) + fabsf((float)encoder_data_2));
+
     uint16_t left_outer   = raw_adc[0];
     uint16_t left_middle  = raw_adc[1];
     uint16_t right_middle = raw_adc[2];
@@ -198,6 +202,9 @@ static void roundabout_detect(void)
                                 ((left_outer_norm - right_middle_norm) > ROUNDABOUT_EXIT_OUTER_DIFF) &&
                                 ((left_middle_norm - right_middle_norm) > ROUNDABOUT_EXIT_MID_DIFF);
 
+    uint8_t encoder_ready = (encoder_speed >= ROUNDABOUT_ENCODER_SPEED_MIN) &&
+                            (travel_since_roundabout >= ROUNDABOUT_ENCODER_TRAVEL_MIN);
+
     if(!roundabout_detected)
     {
         if(approach_pattern || tangent_pattern || adaptive_gap)
@@ -212,13 +219,14 @@ static void roundabout_detect(void)
             roundabout_counter = 0;
         }
 
-        if(roundabout_counter >= ROUNDABOUT_DEBOUNCE && roundabout_cooldown == 0)
+        if(roundabout_counter >= ROUNDABOUT_DEBOUNCE && roundabout_cooldown == 0 && encoder_ready)
         {
             roundabout_detected = 1;
             roundabout_timer = ROUNDABOUT_HOLD_TIME;
             roundabout_cooldown = ROUNDABOUT_COOLDOWN;
             roundabout_lap_timer = 0;
             roundabout_exit_counter = 0;
+            travel_since_roundabout = 0;
         }
     }
     else
@@ -256,6 +264,7 @@ static void roundabout_detect(void)
             roundabout_counter = 0;
             roundabout_exit_counter = 0;
             roundabout_lap_timer = 0;
+            travel_since_roundabout = 0;
         }
     }
 
