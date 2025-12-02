@@ -177,7 +177,7 @@ static void roundabout_detect(void)
                               (left_outer   >= ROUNDABOUT_LEFT_SPIKE) &&
                               (right_outer  >= ROUNDABOUT_RIGHT_SUPPORT);
 
-    if(!roundabout_detected)
+    if(approach_pattern || tangent_pattern)
     {
         if(approach_pattern || tangent_pattern)
         {

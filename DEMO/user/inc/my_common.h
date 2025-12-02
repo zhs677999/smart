@@ -91,6 +91,10 @@
 #define OFF_TRACK_THRESHOLD_RAW      (100)
 #define OFF_TRACK_DEBOUNCE           (5)
 
+// 失线检测（原始值全低则停车）
+#define OFF_TRACK_THRESHOLD_RAW      (100)
+#define OFF_TRACK_DEBOUNCE           (5)
+
 // 速度分段控制
 #define STRAIGHT_DEAD_ZONE_DEG      (2.0f)   // 直道死区，舵机偏差小于该角度时视为直道
 #define STRAIGHT_SPEED_DUTY         (40)     // 直道目标 duty
