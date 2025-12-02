@@ -12,7 +12,9 @@ static pid_controller_t speed_pid;
 static uint8_t pid_initialized = 0;
 
 extern float servo_motor_angle;
+extern float normalized_error;
 extern uint8_t finish_detected;
+extern uint8_t off_track_detected;
 extern uint8_t roundabout_detected;
 extern int16 encoder_data_1;
 extern int16 encoder_data_2;
@@ -26,10 +28,11 @@ void set_speed_pwm()
     }
 
     // 根据舵机偏差设置分段速度，加入直道死区
-    float angle_delta = fabsf(servo_motor_angle - SERVO_MOTOR_M);
+    float steering_offset = servo_motor_angle - SERVO_MOTOR_M;
+    float angle_delta = fabsf(steering_offset);
     int8 target_duty = duty;
 
-    if(finish_detected)
+    if(finish_detected || off_track_detected)
     {
         target_duty = 0; // 终点停下
     }
@@ -65,22 +68,56 @@ void set_speed_pwm()
     if(duty_with_pid > DUTY_MAX_LIMIT) duty_with_pid = DUTY_MAX_LIMIT;
     if(duty_with_pid < 0) duty_with_pid = 0;
 
-    int32_t final_pwm = (int32_t)(duty_with_pid * (PWM_DUTY_MAX / 100.0f));
+    float base_pwm_f = duty_with_pid * (PWM_DUTY_MAX / 100.0f);
 
-    if(final_pwm > PWM_DUTY_MAX) final_pwm = PWM_DUTY_MAX;
-    if(final_pwm < 0) final_pwm = 0;
+    if(base_pwm_f > PWM_DUTY_MAX) base_pwm_f = PWM_DUTY_MAX;
+    if(base_pwm_f < 0) base_pwm_f = 0;
+
+    // 急转弯差速：根据舵机偏转和传感器误差加大内外轮速度差，帮助更快拐弯
+    float steer_ratio = fminf(angle_delta / 10.0f, 1.0f);
+    float error_ratio = fminf(fabsf(normalized_error) * 1.6f, 1.2f);
+    float blended_turn = fminf(0.55f * steer_ratio + 0.45f * error_ratio, 1.2f);
+    float diff_strength = fminf(blended_turn * blended_turn, 1.0f); // 高偏转时急剧放大
+    const float outer_boost = 0.55f;   // 外轮提速比例
+    const float inner_cut   = 0.75f;   // 内轮降速比例
+
+    float left_pwm_f  = base_pwm_f;
+    float right_pwm_f = base_pwm_f;
+
+    if(base_pwm_f > 0)
+    {
+        if(steering_offset >= 0) // 右转：左轮加速，右轮减速
+        {
+            left_pwm_f  = base_pwm_f * (1.0f + outer_boost * diff_strength);
+            right_pwm_f = base_pwm_f * (1.0f - inner_cut * diff_strength);
+        }
+        else // 左转
+        {
+            left_pwm_f  = base_pwm_f * (1.0f - inner_cut * diff_strength);
+            right_pwm_f = base_pwm_f * (1.0f + outer_boost * diff_strength);
+        }
+    }
+
+    float max_pwm_f = (float)PWM_DUTY_MAX;
+    if(left_pwm_f > max_pwm_f) left_pwm_f = max_pwm_f;
+    if(right_pwm_f > max_pwm_f) right_pwm_f = max_pwm_f;
+    if(left_pwm_f < 0) left_pwm_f = 0;
+    if(right_pwm_f < 0) right_pwm_f = 0;
+
+    int32_t left_pwm = (int32_t)(left_pwm_f);
+    int32_t right_pwm = (int32_t)(right_pwm_f);
 
     // --- 电机驱动 ---
     gpio_set_level(MOTOR1_DIR, GPIO_HIGH);
-    pwm_set_duty(MOTOR1_PWM, final_pwm);
+    pwm_set_duty(MOTOR1_PWM, left_pwm);
 
     gpio_set_level(MOTOR2_DIR, GPIO_HIGH);
-    pwm_set_duty(MOTOR2_PWM, final_pwm);
+    pwm_set_duty(MOTOR2_PWM, right_pwm);
 
     // --- 后轮 ---
     gpio_set_level(MOTOR3_DIR, GPIO_HIGH);
-    pwm_set_duty(MOTOR3_PWM, final_pwm);
+    pwm_set_duty(MOTOR3_PWM, left_pwm);
 
     gpio_set_level(MOTOR4_DIR, GPIO_HIGH);
-    pwm_set_duty(MOTOR4_PWM, final_pwm);
+    pwm_set_duty(MOTOR4_PWM, right_pwm);
 }
