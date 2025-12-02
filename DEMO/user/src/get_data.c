@@ -27,6 +27,9 @@ uint8_t roundabout_detected = 0;
 uint16_t roundabout_timer = 0;
 uint16_t roundabout_cooldown = 0;
 uint16_t roundabout_lap_timer = 0;
+roundabout_state_t roundabout_state = ROUND_STATE_IDLE;
+uint8_t roundabout_entry_mark = 0;
+uint8_t roundabout_exit_mark = 0;
 
 // 内部计时与防抖
 static uint16_t finish_counter = 0;
@@ -156,6 +159,10 @@ static void update_roundabout_alert(void)
 // 环岛检测：匹配接近环岛的原始值特征，避免与急弯/十字路混淆；进入后绕一圈再退出
 static void roundabout_detect(void)
 {
+    // 单次事件标记：供调试查看进/出环瞬间
+    roundabout_entry_mark = 0;
+    roundabout_exit_mark = 0;
+
     float encoder_speed = (fabsf((float)encoder_data_1) + fabsf((float)encoder_data_2)) * 0.5f;
     travel_since_roundabout += (uint32_t)(fabsf((float)encoder_data_1) + fabsf((float)encoder_data_2));
 
@@ -194,8 +201,8 @@ static void roundabout_detect(void)
                            ((left_middle_norm - right_middle_norm) > 0.22f) &&
                            ((left_outer_norm  - right_middle_norm) > 0.28f);
 
-    // 出口放宽：绕行达到最小时长后，允许更宽松的亮暗组合触发出口计数，避免卡在环岛内
-    uint8_t soft_exit_pattern = (roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME) &&
+    // 出口放宽：绕行达到最小时长后才开启宽松通道，亮度偏低或距离稍远也能退出计数
+    uint8_t soft_exit_pattern = (roundabout_state == ROUND_STATE_EXIT_SEARCH) &&
                                 (right_middle_norm < ROUNDABOUT_EXIT_GAP_SOFT) &&
                                 (left_outer_norm  > ROUNDABOUT_EXIT_LEFT_MIN) &&
                                 (right_outer_norm > ROUNDABOUT_EXIT_RIGHT_MIN) &&
@@ -205,7 +212,7 @@ static void roundabout_detect(void)
     uint8_t encoder_ready = (encoder_speed >= ROUNDABOUT_ENCODER_SPEED_MIN) &&
                             (travel_since_roundabout >= ROUNDABOUT_ENCODER_TRAVEL_MIN);
 
-    if(!roundabout_detected)
+    if(roundabout_state == ROUND_STATE_IDLE)
     {
         if(approach_pattern || tangent_pattern || adaptive_gap)
         {
@@ -227,6 +234,8 @@ static void roundabout_detect(void)
             roundabout_lap_timer = 0;
             roundabout_exit_counter = 0;
             travel_since_roundabout = 0;
+            roundabout_state = ROUND_STATE_ENTRY_LOCK;
+            roundabout_entry_mark = 1;
         }
     }
     else
@@ -237,14 +246,27 @@ static void roundabout_detect(void)
             roundabout_timer--;
         }
 
+        // 入环锁死阶段结束后进入绕行计时状态
+        if(roundabout_state == ROUND_STATE_ENTRY_LOCK && roundabout_timer == 0)
+        {
+            roundabout_state = ROUND_STATE_LAP;
+        }
+
         if(roundabout_lap_timer < 0xFFFF)
         {
             roundabout_lap_timer++;
         }
 
-        uint8_t exit_pattern = approach_pattern || tangent_pattern || adaptive_gap || soft_exit_pattern; // 绕行一圈后出口会再次出现这些亮暗组合
+        // 达到最小绕行时间后，切换到出口搜索阶段，允许开启放宽通道
+        if(roundabout_state == ROUND_STATE_LAP && roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME)
+        {
+            roundabout_state = ROUND_STATE_EXIT_SEARCH;
+        }
 
-        if(roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME && exit_pattern)
+        uint8_t base_exit_pattern = approach_pattern || tangent_pattern || adaptive_gap;
+        uint8_t exit_pattern = (roundabout_state == ROUND_STATE_EXIT_SEARCH) && (base_exit_pattern || soft_exit_pattern); // 绕行一圈后出口会再次出现这些亮暗组合
+
+        if(exit_pattern)
         {
             if(roundabout_exit_counter < 0xFFFF)
             {
@@ -265,6 +287,8 @@ static void roundabout_detect(void)
             roundabout_exit_counter = 0;
             roundabout_lap_timer = 0;
             travel_since_roundabout = 0;
+            roundabout_state = ROUND_STATE_IDLE;
+            roundabout_exit_mark = 1;
         }
     }
 

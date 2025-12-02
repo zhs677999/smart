@@ -123,6 +123,15 @@
 #define TARGET_COUNT_CURVE          (105.0f)
 #define TARGET_COUNT_ROUNDABOUT     (90.0f)
 
+// 环岛状态机（便于打标记调试进/出环）
+typedef enum
+{
+    ROUND_STATE_IDLE = 0,
+    ROUND_STATE_ENTRY_LOCK,
+    ROUND_STATE_LAP,
+    ROUND_STATE_EXIT_SEARCH,
+} roundabout_state_t;
+
 // 对外暴露的检测状态
 extern float filtered_adc[ADC_CHANNEL_NUMBER];
 extern float normalized_adc[ADC_CHANNEL_NUMBER];
@@ -134,6 +143,9 @@ extern uint8_t roundabout_detected;
 extern uint16_t roundabout_timer;
 extern uint16_t roundabout_cooldown;
 extern uint16_t roundabout_lap_timer;
+extern roundabout_state_t roundabout_state;
+extern uint8_t roundabout_entry_mark;
+extern uint8_t roundabout_exit_mark;
 
 // 数据处理接口
 void process_sensor_data(void);
