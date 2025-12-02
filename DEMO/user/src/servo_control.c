@@ -36,14 +36,14 @@ typedef struct
 // 统一的调参表，配合状态机一眼能看到各工况参数
 static const steering_profile_t steering_profiles[] =
 {
-    [STEER_STRAIGHT]     = {160.0f, 20.0f,   0.0f,  0.0f, 0.25f, 0.84f},
-    [STEER_EASY_LEFT]    = {180.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f},
-    [STEER_EASY_RIGHT]   = {180.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f},
-    [STEER_HARD_LEFT]    = {230.0f, 42.0f, 220.0f, 24.0f, 1.10f, 0.00f},
-    [STEER_HARD_RIGHT]   = {230.0f, 42.0f, 220.0f, 24.0f, 1.10f, 0.00f},
-    [STEER_ROUND_HOLD]   = {110.0f,  0.0f,   0.0f,  0.0f, 0.00f, 0.92f},
-    [STEER_ROUND_CRUISE] = {170.0f, 24.0f, 150.0f, 18.0f, 0.65f, 0.35f},
-    [STEER_ROUND_EXIT]   = {190.0f, 30.0f, 200.0f, 24.0f, 0.90f, 0.25f},
+    [STEER_STRAIGHT]     = {160.0f, 20.0f,   0.0f,  0.0f, 0.25f, 0.84f}, // 直道：低前馈、强粘滞，抑制抖动
+    [STEER_EASY_LEFT]    = {180.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f}, // 缓左：适中 PD 与前馈，略做平滑
+    [STEER_EASY_RIGHT]   = {180.0f, 34.0f, 160.0f, 16.0f, 1.00f, 0.10f}, // 缓右：同上对称
+    [STEER_HARD_LEFT]    = {230.0f, 42.0f, 220.0f, 24.0f, 1.10f, 0.00f}, // 急左：高增益与大前馈，无粘滞便于快速入弯
+    [STEER_HARD_RIGHT]   = {230.0f, 42.0f, 220.0f, 24.0f, 1.10f, 0.00f}, // 急右：同上对称
+    [STEER_ROUND_HOLD]   = {110.0f,  0.0f,   0.0f,  0.0f, 0.00f, 0.92f}, // 入环保持直行：低增益+高粘滞，配合锁死角度
+    [STEER_ROUND_CRUISE] = {170.0f, 24.0f, 150.0f, 18.0f, 0.65f, 0.35f}, // 环内巡航：适中增益，保留少量粘滞防抖
+    [STEER_ROUND_EXIT]   = {190.0f, 30.0f, 200.0f, 24.0f, 0.90f, 0.25f}, // 出口拉出：略放大的 PD 与前馈，适度平滑
 };
 
 // 状态判定阈值
