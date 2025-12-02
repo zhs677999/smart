@@ -82,6 +82,15 @@
 #define ROUNDABOUT_EXIT_RIGHT_MIN   (0.40f)
 #define ROUNDABOUT_EXIT_OUTER_DIFF  (0.20f)
 #define ROUNDABOUT_EXIT_MID_DIFF    (0.14f)
+// 出口原始值辅助通道：依据实测（1488/1641/1103/1099 → 3602/3594/3595/2709 → 3585/3617/2334/1855 → 2307/107/803/3571）
+#define ROUNDABOUT_EXIT_RAW_PLATEAU_L   (3000) // 接近切点时四路普遍升高
+#define ROUNDABOUT_EXIT_RAW_PLATEAU_LM  (3000)
+#define ROUNDABOUT_EXIT_RAW_PLATEAU_RM  (2000)
+#define ROUNDABOUT_EXIT_RAW_PLATEAU_R   (1600)
+#define ROUNDABOUT_EXIT_RAW_CUT_L       (1800) // 切点瞬间左外/右外仍高亮
+#define ROUNDABOUT_EXIT_RAW_CUT_R       (2500)
+#define ROUNDABOUT_EXIT_RAW_CUT_LM      (400)  // 左中、右中迅速变暗
+#define ROUNDABOUT_EXIT_RAW_CUT_RM      (1200)
 // 环岛判定：结合原始值特征，避免与急弯/十字路混淆
 #define ROUNDABOUT_RAW_GAP_STRONG   (180)   // 中右传感器极低，进环岛标志
 #define ROUNDABOUT_RAW_GAP_SOFT     (500)   // 中右明显变暗
@@ -94,6 +103,8 @@
 // 终点检测
 #define FINISH_THRESHOLD            (0.85f)  // 归一化后的阈值
 #define FINISH_DEBOUNCE             (40)     // 基于控制周期
+#define FINISH_HALL_PIN             (D4)     // 霍尔终点检测引脚
+#define FINISH_HALL_DEBOUNCE        (2)      // 霍尔信号变沿计数阈值（结合亮线判定）
 
 // 归一化与滤波配置
 #define ADC_FULL_SCALE              (4095.0f)

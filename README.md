@@ -14,13 +14,15 @@
 3. **归一化**：`normalize_adc` 以 `ADC_FULL_SCALE` 归一化到 0~1，并计算左右差值 `normalized_error = left - right`。
    - 选用差值（difference）而非比值（ratio），避免分母接近 0 时放大噪声，也便于在左右光强接近饱和或过暗时保持线性响应；
    - 如果赛道或传感器布局导致左右幅值差异巨大、易饱和，可考虑改为 `(left - right) / max(left + right, eps)` 的归一化比值，但需要针对空白底板做额外滤波与阈值调整。
-4. **终点检测**：`finish_line_detect` 判断四路同时高亮且持续 `FINISH_DEBOUNCE` 个周期后拉高 `finish_detected`。
+4. **终点检测**：`finish_line_detect` 有两条路径：
+   - 四路同时高亮且持续 `FINISH_DEBOUNCE` 个周期；
+   - 霍尔传感器（`FINISH_HALL_PIN = D4`）出现 `FINISH_HALL_DEBOUNCE` 次变沿时立即置位，用于电磁终点标记。
 5. **环岛检测**：`roundabout_detect` 采用“电感特征 + 编码器速度/里程”双重验证并内置状态机：
    - ADC 检出环岛特征后，只有当编码器平均速度 ≥ `ROUNDABOUT_ENCODER_SPEED_MIN` 且距离上次环岛判定累积行程 ≥ `ROUNDABOUT_ENCODER_TRAVEL_MIN` 才会生效；
    - 触发后置位 `roundabout_detected`，状态切到 `ROUND_STATE_ENTRY_LOCK`，启动 `roundabout_timer = ROUNDABOUT_HOLD_TIME`，开启冷却 `roundabout_cooldown` 并重置里程计数；
    - 状态依次经历“入环锁死 → 绕行计时 → 出口搜索”，并在进入/退出瞬间打单次标记 `roundabout_entry_mark` / `roundabout_exit_mark` 便于示波或日志标注；
    - 根据状态点亮/熄灭 `LED1` 作为提示；
-   - 绕行一圈寻找出口时，除原有特征外还开启“出口放宽”通道（`ROUNDABOUT_EXIT_*`），在亮度偏低或距离稍远时也能计数退出，避免卡在环岛内。
+   - 绕行一圈寻找出口时，除原有特征外还开启“出口放宽”通道（`ROUNDABOUT_EXIT_*`），并辅以原始值特征通道（`ROUNDABOUT_EXIT_RAW_*`）捕捉切点前“整体抬升→左中/右中陡降 + 右外保持高亮”的实测模式，在亮度偏低或距离稍远时也能计数退出，避免卡在环岛内。
 6. **速度目标选择**：`get_target_count_from_state` 根据当前状态切换三档编码器目标：直道、弯道、环岛/终点限速。
 
 ## 舵机控制（`DEMO/user/src/servo_control.c`）

@@ -116,6 +116,26 @@ static void off_track_detect(void)
 // 终点检测：四路同时高亮并持续若干周期
 static void finish_line_detect(void)
 {
+    static uint8_t hall_inited = 0;
+    static uint8_t hall_last_level = 0;
+    static uint16_t hall_change_counter = 0;
+
+    uint8_t hall_level = gpio_get_level(FINISH_HALL_PIN);
+    if(!hall_inited)
+    {
+        hall_last_level = hall_level;
+        hall_inited = 1;
+    }
+
+    if(hall_level != hall_last_level)
+    {
+        hall_last_level = hall_level;
+        if(hall_change_counter < 0xFFFF)
+        {
+            hall_change_counter++;
+        }
+    }
+
     uint8_t all_high = 1;
     for(channel_index = 0; channel_index < ADC_CHANNEL_NUMBER; channel_index ++)
     {
@@ -139,6 +159,11 @@ static void finish_line_detect(void)
     }
 
     if(finish_counter >= FINISH_DEBOUNCE)
+    {
+        finish_detected = 1;
+    }
+
+    if(hall_change_counter >= FINISH_HALL_DEBOUNCE)
     {
         finish_detected = 1;
     }
@@ -209,6 +234,19 @@ static void roundabout_detect(void)
                                 ((left_outer_norm - right_middle_norm) > ROUNDABOUT_EXIT_OUTER_DIFF) &&
                                 ((left_middle_norm - right_middle_norm) > ROUNDABOUT_EXIT_MID_DIFF);
 
+    // 基于实测原始值的出口辅助通道：靠近切点时四路拉高，切点瞬间左中/右中掉落而右外保持高亮
+    uint8_t raw_exit_plateau = (roundabout_state == ROUND_STATE_EXIT_SEARCH) &&
+                               (left_outer   >= ROUNDABOUT_EXIT_RAW_PLATEAU_L) &&
+                               (left_middle  >= ROUNDABOUT_EXIT_RAW_PLATEAU_LM) &&
+                               (right_middle >= ROUNDABOUT_EXIT_RAW_PLATEAU_RM) &&
+                               (right_outer  >= ROUNDABOUT_EXIT_RAW_PLATEAU_R);
+
+    uint8_t raw_exit_cut = (roundabout_state == ROUND_STATE_EXIT_SEARCH) &&
+                           (left_outer   >= ROUNDABOUT_EXIT_RAW_CUT_L) &&
+                           (right_outer  >= ROUNDABOUT_EXIT_RAW_CUT_R) &&
+                           (left_middle  <= ROUNDABOUT_EXIT_RAW_CUT_LM) &&
+                           (right_middle <= ROUNDABOUT_EXIT_RAW_CUT_RM);
+
     uint8_t encoder_ready = (encoder_speed >= ROUNDABOUT_ENCODER_SPEED_MIN) &&
                             (travel_since_roundabout >= ROUNDABOUT_ENCODER_TRAVEL_MIN);
 
@@ -264,7 +302,8 @@ static void roundabout_detect(void)
         }
 
         uint8_t base_exit_pattern = approach_pattern || tangent_pattern || adaptive_gap;
-        uint8_t exit_pattern = (roundabout_state == ROUND_STATE_EXIT_SEARCH) && (base_exit_pattern || soft_exit_pattern); // 绕行一圈后出口会再次出现这些亮暗组合
+        uint8_t exit_pattern = (roundabout_state == ROUND_STATE_EXIT_SEARCH) &&
+                                (base_exit_pattern || soft_exit_pattern || raw_exit_plateau || raw_exit_cut); // 绕行一圈后出口会再次出现这些亮暗组合
 
         if(exit_pattern)
         {
