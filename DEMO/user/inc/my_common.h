@@ -63,7 +63,7 @@
 
 // 环岛检测
 #define ROUNDABOUT_THRESHOLD        (800)
-#define ROUNDABOUT_DEBOUNCE         (25)
+#define ROUNDABOUT_DEBOUNCE         (30)
 #define ROUNDABOUT_HOLD_TIME        (200)
 #define ROUNDABOUT_COOLDOWN         (300)
 #define ROUNDABOUT_INERTIA_TIME     (0)     // 默认关闭惰性变向，改为锁死入环/出环
