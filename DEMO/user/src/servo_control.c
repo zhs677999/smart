@@ -18,6 +18,12 @@ static const float quick_turn_feedforward = 260.0f;
 // 连续反向急弯的额外前馈，帮助舵机快速“打回来”
 static const float sign_flip_threshold = 0.95f;
 static const float sign_flip_boost     = 140.0f;
+// 掉头弯：长时间大幅同向转弯后，如果瞬间换向，先暂缓反打，避免按“S 弯”处理
+static const float hairpin_sustain_error    = 0.55f;   // 认定为大幅同向转弯的误差门限
+static const uint16_t hairpin_sustain_ticks = 18;      // 连续多久算“已进入掉头弯”（约 90ms）
+static const uint16_t hairpin_settle_ticks  = 14;      // 翻向后软化期（约 70ms）
+static const float hairpin_damping          = 0.55f;   // 软化期降低 D 项幅度
+static const float hairpin_quick_scale      = 0.35f;   // 软化期削弱快速前馈
 // 限制快速前馈的量级，避免在连续急弯时过度回正
 static const float quick_out_limit_deg = 22.0f;
 // 环岛进入时的舵机直行保持比例（靠计时器逐渐退出）
@@ -33,6 +39,9 @@ extern float normalized_adc[ADC_CHANNEL_NUMBER];
 float last_adc_error = 0;           // 上一次误差（用于 D 项与换向检测）
 extern uint8_t roundabout_detected;
 extern uint16_t roundabout_timer;
+static uint16_t sustained_turn_ticks = 0;   // 同向大幅转弯持续时间
+static int8_t sustained_turn_sign = 0;       // 最近一次持续转弯的方向
+static uint16_t hairpin_settle_timer = 0;    // 掉头弯换向后的软化计时
 
 void set_servo_pwm()
 {
@@ -69,8 +78,53 @@ void set_servo_pwm()
     float enhanced_error = normalized_error * error_gain;
     float error_delta = enhanced_error - last_adc_error;
 
+    // 统计是否出现“掉头弯”：同向大误差持续后突然换向
+    if(hairpin_settle_timer > 0)
+    {
+        hairpin_settle_timer--;
+    }
+
+    int8_t current_sign = (enhanced_error > 0.0f) - (enhanced_error < 0.0f);
+    if((fabsf(enhanced_error) > hairpin_sustain_error) && (current_sign != 0))
+    {
+        if(current_sign == sustained_turn_sign)
+        {
+            if(sustained_turn_ticks < 0xFFFF)
+            {
+                sustained_turn_ticks++;
+            }
+        }
+        else
+        {
+            sustained_turn_sign = current_sign;
+            sustained_turn_ticks = 1;
+        }
+    }
+    else if(current_sign == sustained_turn_sign)
+    {
+        // 保持方向但幅度变小：轻微衰减计数，避免偶尔抖动清零
+        if(sustained_turn_ticks > 0)
+        {
+            sustained_turn_ticks--;
+        }
+    }
+    else
+    {
+        sustained_turn_ticks = 0;
+        sustained_turn_sign = current_sign;
+    }
+
+    if((current_sign != 0) && (sustained_turn_sign != 0) && (current_sign != sustained_turn_sign) &&
+       (sustained_turn_ticks >= hairpin_sustain_ticks) && (fabsf(last_adc_error) > hairpin_sustain_error))
+    {
+        // 处于掉头弯：刚换向时先进入软化期，防止误判为连续反打
+        hairpin_settle_timer = hairpin_settle_ticks;
+        sustained_turn_ticks = 1;
+        sustained_turn_sign = current_sign;
+    }
+
     float p_out = adaptive_kp * enhanced_error;
-    float d_out = kd_local * error_delta;
+    float d_out = kd_local * error_delta * (hairpin_settle_timer ? hairpin_damping : 1.0f);
 
     // 快速转向前馈：误差大的时候直接给舵机额外角度，减少响应延迟
     float quick_out = 0.0f;
@@ -80,9 +134,15 @@ void set_servo_pwm()
     }
 
     // 连续左右急弯或换向时，额外给出“反打”前馈，提前让舵机回中换向
-    if ((enhanced_error * last_adc_error < 0.0f) && (fabsf(enhanced_error) > sign_flip_threshold)) {
+    if ((enhanced_error * last_adc_error < 0.0f) && (fabsf(enhanced_error) > sign_flip_threshold) && (hairpin_settle_timer == 0)) {
         // 二次急弯时回正更温和，避免过度反打
         quick_out += sign_flip_boost * enhanced_error;
+    }
+
+    // 掉头弯换向软化：暂时削弱前馈，防止直接把舵机打到反方向极限
+    if(hairpin_settle_timer > 0)
+    {
+        quick_out *= hairpin_quick_scale;
     }
 
     // 限制快速前馈幅度，防止占满舵机行程导致第二个急弯出不去
