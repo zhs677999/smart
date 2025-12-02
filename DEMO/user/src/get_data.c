@@ -26,11 +26,13 @@ uint8_t off_track_detected = 0;
 uint8_t roundabout_detected = 0;
 uint16_t roundabout_timer = 0;
 uint16_t roundabout_cooldown = 0;
+uint16_t roundabout_lap_timer = 0;
 
 // 内部计时与防抖
 static uint16_t finish_counter = 0;
 static uint16_t off_track_counter = 0;
 static uint16_t roundabout_counter = 0;
+static uint16_t roundabout_exit_counter = 0;
 
 // -------------------------------------------------------------
 
@@ -150,7 +152,7 @@ static void update_roundabout_alert(void)
     }
 }
 
-// 环岛检测：匹配接近环岛的原始值特征，避免与急弯/十字路混淆
+// 环岛检测：匹配接近环岛的原始值特征，避免与急弯/十字路混淆；进入后绕一圈再退出
 static void roundabout_detect(void)
 {
     uint16_t left_outer   = raw_adc[0];
@@ -177,32 +179,62 @@ static void roundabout_detect(void)
 
     if(approach_pattern || tangent_pattern)
     {
-        if(roundabout_counter < 0xFFFF)
+        if(approach_pattern || tangent_pattern)
         {
-            roundabout_counter++;
+            if(roundabout_counter < 0xFFFF)
+            {
+                roundabout_counter++;
+            }
+        }
+        else
+        {
+            roundabout_counter = 0;
+        }
+
+        if(roundabout_counter >= ROUNDABOUT_DEBOUNCE && roundabout_cooldown == 0)
+        {
+            roundabout_detected = 1;
+            roundabout_timer = ROUNDABOUT_HOLD_TIME;
+            roundabout_cooldown = ROUNDABOUT_COOLDOWN;
+            roundabout_lap_timer = 0;
+            roundabout_exit_counter = 0;
         }
     }
     else
     {
-        roundabout_counter = 0;
-    }
-
-    if(roundabout_counter >= ROUNDABOUT_DEBOUNCE && roundabout_detected == 0 && roundabout_cooldown == 0)
-    {
-        roundabout_detected = 1;
-        roundabout_timer = ROUNDABOUT_HOLD_TIME;
-        roundabout_cooldown = ROUNDABOUT_COOLDOWN;
-    }
-
-    if(roundabout_detected)
-    {
+        // 已进入环岛：计时并寻找绕行一圈后的出口特征
         if(roundabout_timer > 0)
         {
             roundabout_timer--;
         }
+
+        if(roundabout_lap_timer < 0xFFFF)
+        {
+            roundabout_lap_timer++;
+        }
+
+        uint8_t exit_pattern = approach_pattern || tangent_pattern; // 绕行一圈后出口会再次出现这些亮暗组合
+
+        if(roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME && exit_pattern)
+        {
+            if(roundabout_exit_counter < 0xFFFF)
+            {
+                roundabout_exit_counter++;
+            }
+        }
         else
         {
+            roundabout_exit_counter = 0;
+        }
+
+        if(roundabout_exit_counter >= ROUNDABOUT_EXIT_CONFIRM || roundabout_lap_timer >= ROUNDABOUT_MAX_LAP_TIME)
+        {
             roundabout_detected = 0;
+            roundabout_timer = 0;
+            roundabout_cooldown = ROUNDABOUT_COOLDOWN; // 出环岛后暂时不再触发
+            roundabout_counter = 0;
+            roundabout_exit_counter = 0;
+            roundabout_lap_timer = 0;
         }
     }
 
