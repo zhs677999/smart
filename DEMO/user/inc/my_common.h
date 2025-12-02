@@ -67,7 +67,7 @@
 #define ROUNDABOUT_HOLD_TIME        (200)
 #define ROUNDABOUT_COOLDOWN         (300)
 // 环岛绕行逻辑
-#define ROUNDABOUT_LAP_MIN_TIME     (400)   // 需要至少绕行一段时间后再寻找出口
+#define ROUNDABOUT_LAP_MIN_TIME     (500)   // 需要至少绕行一段时间后再寻找出口
 #define ROUNDABOUT_MAX_LAP_TIME     (1600)  // 超时保护，防止一直卡在环岛状态
 #define ROUNDABOUT_EXIT_CONFIRM     (18)    // 检测到出口模式的防抖计数
 // 环岛判定：结合原始值特征，避免与急弯/十字路混淆
@@ -85,24 +85,24 @@
 
 // 归一化与滤波配置
 #define ADC_FULL_SCALE              (4095.0f)
-#define FILTER_ALPHA                (0.35f)  // 一阶低通滤波系数
+#define FILTER_ALPHA                (0.20f)  // 一阶低通滤波系数
 
 // 失线检测（原始值全低则停车）
 #define OFF_TRACK_THRESHOLD_RAW      (100)
 #define OFF_TRACK_DEBOUNCE           (5)
 
 // 速度分段控制
-#define STRAIGHT_DEAD_ZONE_DEG      (3.0f)   // 直道死区，舵机偏差小于该角度时视为直道
-#define STRAIGHT_SPEED_DUTY         (35)     // 直道目标 duty
-#define CURVE_SPEED_DUTY            (24)     // 弯道目标 duty，降低过弯速度防止打滑
-#define ROUNDABOUT_SPEED_DUTY       (15)     // 环岛、终点等复杂场景的限速
-#define DUTY_MAX_LIMIT              (40)
+#define STRAIGHT_DEAD_ZONE_DEG      (2.0f)   // 直道死区，舵机偏差小于该角度时视为直道
+#define STRAIGHT_SPEED_DUTY         (40)     // 直道目标 duty
+#define CURVE_SPEED_DUTY            (28)     // 弯道目标 duty，降低过弯速度防止打滑
+#define ROUNDABOUT_SPEED_DUTY       (26)     // 环岛、终点等复杂场景的限速
+#define DUTY_MAX_LIMIT              (50)
 #define DUTY_MIN_LIMIT              (10)
 
 // 电机 PID 参数（用于速度环）
-#define MOTOR_PID_KP                (0.12f)
-#define MOTOR_PID_KI                (0.02f)
-#define MOTOR_PID_KD                (0.01f)
+#define MOTOR_PID_KP                (0.22f)
+#define MOTOR_PID_KI                (0.06f)
+#define MOTOR_PID_KD                (0.03f)
 #define MOTOR_PID_OUTPUT_LIMIT      ((float)PWM_DUTY_MAX)
 #define MOTOR_PID_INTEGRAL_LIMIT    (150.0f)
 
