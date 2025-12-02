@@ -177,9 +177,22 @@ static void roundabout_detect(void)
                               (left_outer   >= ROUNDABOUT_LEFT_SPIKE) &&
                               (right_outer  >= ROUNDABOUT_RIGHT_SUPPORT);
 
+    // 自适应模式：整体亮度偏低时，要求左右外侧至少保持 55%/45% 亮度，且中右明显暗于中左
+    float left_outer_norm   = normalized_adc[0];
+    float left_middle_norm  = normalized_adc[1];
+    float right_middle_norm = normalized_adc[2];
+    float right_outer_norm  = normalized_adc[3];
+
+    uint8_t adaptive_gap = (right_middle_norm < 0.32f) &&
+                           (left_outer_norm  > 0.55f) &&
+                           (right_outer_norm > 0.45f) &&
+                           (left_middle_norm > 0.42f) &&
+                           ((left_middle_norm - right_middle_norm) > 0.22f) &&
+                           ((left_outer_norm  - right_middle_norm) > 0.28f);
+
     if(!roundabout_detected)
     {
-        if(approach_pattern || tangent_pattern)
+        if(approach_pattern || tangent_pattern || adaptive_gap)
         {
             if(roundabout_counter < 0xFFFF)
             {
@@ -213,7 +226,7 @@ static void roundabout_detect(void)
             roundabout_lap_timer++;
         }
 
-        uint8_t exit_pattern = approach_pattern || tangent_pattern; // 绕行一圈后出口会再次出现这些亮暗组合
+        uint8_t exit_pattern = approach_pattern || tangent_pattern || adaptive_gap; // 绕行一圈后出口会再次出现这些亮暗组合
 
         if(roundabout_lap_timer >= ROUNDABOUT_LAP_MIN_TIME && exit_pattern)
         {
