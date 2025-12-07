@@ -75,11 +75,11 @@ void set_speed_pwm()
 
     // 急转弯差速：根据舵机偏转和传感器误差加大内外轮速度差，帮助更快拐弯
     float steer_ratio = fminf(angle_delta / 10.0f, 1.0f);
-    float error_ratio = fminf(fabsf(normalized_error) * 1.6f, 1.2f);
-    float blended_turn = fminf(0.55f * steer_ratio + 0.45f * error_ratio, 1.2f);
+    float error_ratio = fminf(fabsf(normalized_error) * 2.0f, 1.2f);
+    float blended_turn = fminf(0.65f * steer_ratio + 0.35f * error_ratio, 1.2f);
     float diff_strength = fminf(blended_turn * blended_turn, 1.0f); // 高偏转时急剧放大
-    const float outer_boost = 0.55f;   // 外轮提速比例
-    const float inner_cut   = 0.75f;   // 内轮降速比例
+    const float outer_boost = 0.10f;    // 略微加速外轮，仍保留内轮减速以防过冲
+    const float inner_cut   = 0.50f;   // 仅适度降速内轮
 
     float left_pwm_f  = base_pwm_f;
     float right_pwm_f = base_pwm_f;
